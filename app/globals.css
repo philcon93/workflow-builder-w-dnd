@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+}
+
+.react-flow__edge-path[data-active="true"] {
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+}
+
+.dragging-over.valid-drop-target
+  .react-flow__edge:hover
+  .react-flow__edge-path {
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+  stroke-dasharray: 5 !important;
+}
+
+.dragging-over:not(.valid-drop-target) {
+  background-color: rgba(239, 68, 68, 0.05);
+  cursor: not-allowed;
+}
+
+.invalid-drop-target.dragging-over::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23f87171' fill-opacity='0.1' fill-rule='evenodd'%3E%3Cpath d='M0 40L40 0H20L0 20M40 40V20L20 40'/%3E%3C/g%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+.react-flow__handle {
+  opacity: 0;
+}
+
+.react-flow__node {
+  cursor: grab;
+}
+
+.react-flow__node.selected {
+  box-shadow: 0 0 0 2px #7c3aed;
+}
+
+/* Style for the edge drop zone plus button */
+.edge-dropzone-button {
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+.valid-drop-target .edge-dropzone-button {
+  transform: scale(1.2);
+  background-color: #7c3aed;
+}
+
+.dragging-over.valid-drop-target .react-flow__edge {
+  z-index: 10;
+}
+
+/* DnD Kit styles */
+.dnd-kit-dragging-over .react-flow__edge-path {
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+  stroke-dasharray: 5 !important;
+}
+
+.dnd-kit-drop-indicator {
+  background-color: #7c3aed;
+  color: white;
+}
+
+/* Hello Pangea DnD styles */
+.pangea-dragging-over .react-flow__edge-path {
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+  stroke-dasharray: 5 !important;
+}
+
+.pangea-drop-indicator {
+  background-color: #7c3aed;
+  color: white;
+}
+
+/* Enhance the edge path hover effect for Hello Pangea DnD */
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+}
+
+/* Style for the edge drop zone plus button */
+.edge-dropzone-button {
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
