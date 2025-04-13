@@ -15,6 +15,7 @@ import {
   type NodeTypes,
   type EdgeTypes,
   MarkerType,
+  PanOnScrollMode,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
@@ -39,7 +40,7 @@ const initialNodes: Node[] = [
   {
     id: "start",
     type: "start",
-    position: { x: 250, y: 50 },
+    position: { x: 250, y: 0 },
     data: { label: "Start" },
   },
   {
@@ -57,7 +58,7 @@ const initialNodes: Node[] = [
   {
     id: "notification",
     type: "action",
-    position: { x: 250, y: 250 },
+    position: { x: 250, y: 300 },
     data: {
       id: "notification",
       label: "Notification",
@@ -325,8 +326,8 @@ function FlowCanvas() {
 
     // Calculate position for the plus button
     const plusButtonPosition = {
-      x: lastNode.position.x,
-      y: lastNode.position.y + 100,
+      x: lastNode.position.x + 110,
+      y: lastNode.position.y + 150,
     };
 
     // Check if plus button already exists
@@ -434,6 +435,11 @@ function FlowCanvas() {
               onConnect={onConnect}
               nodeTypes={nodeTypes}
               edgeTypes={edgeTypes}
+              panOnScroll
+              panOnScrollMode={PanOnScrollMode.Vertical}
+              zoomOnScroll={false}
+              panOnDrag={false}
+              nodesDraggable={false}
               fitView
               proOptions={{ hideAttribution: true }}
             >

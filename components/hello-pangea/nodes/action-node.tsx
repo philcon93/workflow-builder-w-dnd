@@ -1,7 +1,7 @@
 "use client";
 
 import { Handle, Position } from "@xyflow/react";
-import { Draggable, Droppable } from "@hello-pangea/dnd";
+import { Draggable, DraggableChildrenFn, Droppable } from "@hello-pangea/dnd";
 import {
   Mail,
   MessageSquare,
@@ -36,58 +36,65 @@ const getIconComponent = (iconName: string) => {
 };
 
 export function ActionNode({ id, data }: { id: string; data: any }) {
-  return (
+  const renderItem: DraggableChildrenFn = (provided, snapshot, rubric) => (
     <div
-      className={`relative flex h-16 w-64 items-center justify-start rounded-md ${
-        data.color || "bg-white"
-      } shadow-md`}
+      ref={provided.innerRef}
+      {...provided.draggableProps}
+      className={`absolute inset-0 flex items-center ${
+        snapshot.isDragging ? "opacity-50" : ""
+      }`}
     >
+      <div className="flex w-full items-center space-x-3 p-4">
+        <div
+          {...provided.dragHandleProps}
+          className="cursor-grab rounded p-1 hover:bg-black/5"
+        >
+          <GripVertical className="h-5 w-5 text-gray-400" />
+        </div>
+        <div>{getIconComponent(data.iconName)}</div>
+        <div className="text-md font-medium">{data.label}</div>
+      </div>
+    </div>
+  );
+  return (
+    <>
       <Handle
         type="target"
         position={Position.Top}
         id="t"
         style={{ visibility: "hidden" }}
       />
-      <Droppable droppableId={`node-${id}`} type="NODE" isDropDisabled={true}>
+      <Droppable
+        droppableId={`node-${id}`}
+        type="NODE"
+        isDropDisabled={true}
+        renderClone={renderItem}
+      >
         {(provided) => (
-          <div ref={provided.innerRef} {...provided.droppableProps}>
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={`relative flex h-16 w-64 items-center justify-start rounded-md ${
+              data.color || "bg-white"
+            } shadow-md`}
+          >
             <Draggable
               draggableId={`node-${id}`}
               index={0}
-              isDragDisabled={false}
+              // isDragDisabled={false}
             >
-              {(provided, snapshot) => (
-                <div
-                  ref={provided.innerRef}
-                  {...provided.draggableProps}
-                  className="absolute inset-0 flex items-center"
-                  data-draggable-node={id}
-                >
-                  <div className="flex w-full items-center space-x-3 p-4">
-                    <div>{getIconComponent(data.iconName)}</div>
-                    <div className="text-md font-medium">{data.label}</div>
-
-                    <div
-                      {...provided.dragHandleProps}
-                      className="ml-auto cursor-grab rounded p-1 hover:bg-black/5"
-                    >
-                      <GripVertical className="h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-              )}
+              {renderItem}
             </Draggable>
             {provided.placeholder}
           </div>
         )}
       </Droppable>
-
       <Handle
         type="source"
         position={Position.Bottom}
         id="b"
         style={{ visibility: "hidden" }}
       />
-    </div>
+    </>
   );
 }
