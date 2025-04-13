@@ -1,6 +1,10 @@
-import Link from "next/link"
+import Link from "next/link";
 
-export function NavigationHeader({ currentLibrary }: { currentLibrary: string }) {
+export function NavigationHeader({
+  currentLibrary,
+}: {
+  currentLibrary: string;
+}) {
   return (
     <div className="flex items-center justify-between border-b border-gray-200 bg-white p-4">
       <div className="flex items-center space-x-2">
@@ -23,16 +27,11 @@ export function NavigationHeader({ currentLibrary }: { currentLibrary: string })
         </Link>
       </div>
 
-      <div className="text-lg font-semibold">Workflow Builder with {currentLibrary}</div>
-
-      <div className="flex space-x-2">
-        <button className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">
-          Download
-        </button>
-        <button className="rounded-md bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700">
-          Layout
-        </button>
+      <div className="text-lg font-semibold">
+        Workflow Builder with {currentLibrary}
       </div>
+
+      <div className="flex space-x-2"></div>
     </div>
-  )
+  );
 }

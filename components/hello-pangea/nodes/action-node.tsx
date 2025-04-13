@@ -1,7 +1,13 @@
 "use client";
 
 import { Handle, Position } from "@xyflow/react";
-import { Draggable, DraggableChildrenFn, Droppable } from "@hello-pangea/dnd";
+import {
+  Draggable,
+  type DraggableChildrenFn,
+  DraggableProvided,
+  DraggableStateSnapshot,
+  Droppable,
+} from "@hello-pangea/dnd";
 import {
   Mail,
   MessageSquare,
@@ -36,26 +42,45 @@ const getIconComponent = (iconName: string) => {
 };
 
 export function ActionNode({ id, data }: { id: string; data: any }) {
-  const renderItem: DraggableChildrenFn = (provided, snapshot, rubric) => (
-    <div
-      ref={provided.innerRef}
-      {...provided.draggableProps}
-      className={`absolute inset-0 flex items-center ${
-        snapshot.isDragging ? "opacity-50" : ""
-      }`}
-    >
-      <div className="flex w-full items-center space-x-3 p-4">
+  const renderItem =
+    (itemType: "clone" | "draggable") =>
+    (provided: DraggableProvided, snapshot: DraggableStateSnapshot) => {
+      const containerClasses =
+        itemType === "clone"
+          ? `relative flex h-16 w-64 items-center justify-start rounded-md ${
+              data.color || "bg-white"
+            } shadow-md`
+          : undefined;
+      return (
         <div
-          {...provided.dragHandleProps}
-          className="cursor-grab rounded p-1 hover:bg-black/5"
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          style={{
+            ...provided.draggableProps.style,
+            width: "256px",
+            height: "64px",
+          }}
+          className={containerClasses}
         >
-          <GripVertical className="h-5 w-5 text-gray-400" />
+          <div
+            className={`absolute inset-0 flex items-center ${
+              snapshot.isDragging ? "opacity-50" : ""
+            }`}
+          >
+            <div className="flex w-full items-center space-x-3 p-4">
+              <div
+                {...provided.dragHandleProps}
+                className="cursor-grab rounded p-1 hover:bg-black/5"
+              >
+                <GripVertical className="h-5 w-5 text-gray-400" />
+              </div>
+              <div>{getIconComponent(data.iconName)}</div>
+              <div className="text-md font-medium">{data.label}</div>
+            </div>
+          </div>
         </div>
-        <div>{getIconComponent(data.iconName)}</div>
-        <div className="text-md font-medium">{data.label}</div>
-      </div>
-    </div>
-  );
+      );
+    };
   return (
     <>
       <Handle
@@ -68,7 +93,7 @@ export function ActionNode({ id, data }: { id: string; data: any }) {
         droppableId={`node-${id}`}
         type="NODE"
         isDropDisabled={true}
-        renderClone={renderItem}
+        renderClone={renderItem("clone")}
       >
         {(provided) => (
           <div
@@ -83,7 +108,7 @@ export function ActionNode({ id, data }: { id: string; data: any }) {
               index={0}
               // isDragDisabled={false}
             >
-              {renderItem}
+              {renderItem("draggable")}
             </Draggable>
             {provided.placeholder}
           </div>

@@ -4,13 +4,8 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-8">
       <h1 className="mb-8 text-3xl font-bold">Workflow Builder Examples</h1>
-      <p className="mb-8 text-center text-gray-600 max-w-2xl">
-        Three implementations of the same workflow builder using different drag
-        and drop libraries. Each implementation allows you to drag nodes from
-        the sidebar and drop them on edge connections.
-      </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
         <LibraryCard
           title="Hello Pangea DnD"
           description="Component-based drag and drop with smooth animations"

@@ -7,7 +7,6 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
-  Controls,
   Background,
   type Connection,
   type Edge,
@@ -16,13 +15,18 @@ import {
   type EdgeTypes,
   MarkerType,
   PanOnScrollMode,
+  useNodesInitialized,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { Sidebar } from "./sidebar";
-import { ActionNode, StartNode } from "./nodes";
+import { StartNode } from "./nodes/start-node";
+import { ActionNode } from "./nodes/action-node";
 import { EdgeDropZone } from "./edge-drop-zone";
 import { NavigationHeader } from "../navigation-header";
+import { useSetViewport } from "./useSetViewport";
+import { useCanvasSize } from "./useCanvasSize";
+import { useTranslateExtent } from "./useTranslateExtent";
 
 // Define custom node types
 const nodeTypes: NodeTypes = {
@@ -112,6 +116,13 @@ function FlowCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [sidebarItems, setSidebarItems] = useState<any[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const { translateExtent } = useTranslateExtent();
+  const { setFlowViewport } = useSetViewport();
+  const { width } = useCanvasSize();
+  const nodesInitialized = useNodesInitialized();
+  const [viewportInitialized, setViewportInitialized] = useState(false);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -134,9 +145,16 @@ function FlowCanvas() {
     [setEdges]
   );
 
+  // Handle drag start
+  const onDragStart = useCallback(() => {
+    setIsDragging(true);
+  }, []);
+
   // Handle drag end from hello-pangea/dnd
   const onDragEnd = useCallback(
     (result: DropResult) => {
+      setIsDragging(false);
+
       const { destination, source, draggableId } = result;
 
       // If dropped outside a droppable area
@@ -313,6 +331,19 @@ function FlowCanvas() {
     [edges, nodes, sidebarItems, setNodes, setEdges]
   );
 
+  useEffect(() => {
+    if (nodesInitialized && !viewportInitialized) {
+      setViewportInitialized(true);
+
+      // set initial viewport
+      setFlowViewport(30);
+    }
+  }, [nodesInitialized, setFlowViewport, viewportInitialized]);
+
+  useEffect(() => {
+    setFlowViewport();
+  }, [width, setFlowViewport]);
+
   // Add a plus button node at the end of the workflow
   useEffect(() => {
     // Find the last node in the workflow
@@ -326,7 +357,7 @@ function FlowCanvas() {
 
     // Calculate position for the plus button
     const plusButtonPosition = {
-      x: lastNode.position.x + 110,
+      x: lastNode.position.x + 108,
       y: lastNode.position.y + 150,
     };
 
@@ -421,7 +452,7 @@ function FlowCanvas() {
   }, [nodes, edges, setNodes, setEdges]);
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="flex h-screen w-full">
         <Sidebar setSidebarItems={setSidebarItems} />
         <div className="flex h-full flex-1 flex-col">
@@ -429,26 +460,28 @@ function FlowCanvas() {
           <div className="h-full w-full flex-1" ref={reactFlowWrapper}>
             <ReactFlow
               nodes={nodes}
-              edges={edges}
+              edges={edges.map((edge) => ({
+                ...edge,
+                data: { ...edge.data, isDragging },
+              }))}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
+              fitView={false}
               panOnScroll
               panOnScrollMode={PanOnScrollMode.Vertical}
               zoomOnScroll={false}
               panOnDrag={false}
               nodesDraggable={false}
-              fitView
+              nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               proOptions={{ hideAttribution: true }}
+              edgesFocusable={false}
+              defaultEdgeOptions={{ selectable: false }}
+              nodesFocusable={false}
+              translateExtent={translateExtent}
             >
               <Background color="#aaa" gap={16} />
-              <Controls
-                position="bottom-left"
-                showInteractive={false}
-                className="bg-white"
-              />
             </ReactFlow>
           </div>
         </div>
