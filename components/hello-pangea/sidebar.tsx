@@ -1,45 +1,57 @@
-"use client"
+"use client";
 
-import { useEffect, useMemo } from "react"
-import { Draggable, Droppable } from "@hello-pangea/dnd"
-import { Mail, MessageSquare, User, Bell, Webhook, Clock, GitBranch } from "lucide-react"
+import { useEffect, useMemo } from "react";
+import { Draggable, Droppable } from "@hello-pangea/dnd";
+import {
+  Mail,
+  MessageSquare,
+  User,
+  Bell,
+  Webhook,
+  Clock,
+  GitBranch,
+} from "lucide-react";
 
 type NodeCategory = {
-  title: string
-  items: NodeItem[]
-}
+  title: string;
+  items: NodeItem[];
+};
 
 type NodeItem = {
-  id: string
-  label: string
-  iconName: string
-  category: string
-  color: string
-}
+  id: string;
+  label: string;
+  iconName: string;
+  category: string;
+  color: string;
+};
 
 // Function to get the icon component based on name
 const getIconComponent = (iconName: string) => {
   switch (iconName) {
     case "mail":
-      return <Mail className="h-5 w-5 text-emerald-500" />
+      return <Mail className="h-5 w-5 text-emerald-500" />;
     case "messageSquare":
-      return <MessageSquare className="h-5 w-5 text-emerald-500" />
+      return <MessageSquare className="h-5 w-5 text-emerald-500" />;
     case "user":
-      return <User className="h-5 w-5 text-amber-500" />
+      return <User className="h-5 w-5 text-amber-500" />;
     case "bell":
-      return <Bell className="h-5 w-5 text-indigo-500" />
+      return <Bell className="h-5 w-5 text-indigo-500" />;
     case "webhook":
-      return <Webhook className="h-5 w-5 text-blue-500" />
+      return <Webhook className="h-5 w-5 text-blue-500" />;
     case "clock":
-      return <Clock className="h-5 w-5 text-blue-500" />
+      return <Clock className="h-5 w-5 text-blue-500" />;
     case "gitBranch":
-      return <GitBranch className="h-5 w-5 text-gray-500" />
+      return <GitBranch className="h-5 w-5 text-gray-500" />;
     default:
-      return null
+      return null;
   }
-}
+};
 
-export function Sidebar({ setSidebarItems }: { setSidebarItems: (items: NodeItem[]) => void }) {
+export function Sidebar({
+  setSidebarItems,
+}: {
+  setSidebarItems: (items: NodeItem[]) => void;
+}) {
   const categories: NodeCategory[] = useMemo(
     () => [
       {
@@ -107,25 +119,37 @@ export function Sidebar({ setSidebarItems }: { setSidebarItems: (items: NodeItem
         ],
       },
     ],
-    [],
-  )
+    []
+  );
 
   // Collect all items for the parent component
   useEffect(() => {
-    const allItems = categories.flatMap((category) => category.items)
-    setSidebarItems(allItems)
-  }, [categories, setSidebarItems])
+    const allItems = categories.flatMap((category) => category.items);
+    setSidebarItems(allItems);
+  }, [categories, setSidebarItems]);
 
   return (
     <div className="w-60 overflow-y-auto border-r border-gray-200 bg-white p-4">
       {categories.map((category, categoryIndex) => (
         <div key={category.title} className="mb-6">
           <h2 className="mb-2 text-lg font-semibold">{category.title}</h2>
-          <Droppable droppableId={`category-${categoryIndex}`} type="SIDEBAR" isDropDisabled={true}>
+          <Droppable
+            droppableId={`category-${categoryIndex}`}
+            type="NODE"
+            isDropDisabled={true}
+          >
             {(provided) => (
-              <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+              <div
+                ref={provided.innerRef}
+                {...provided.droppableProps}
+                className="space-y-2"
+              >
                 {category.items.map((item, index) => (
-                  <Draggable key={item.id} draggableId={item.id} index={index}>
+                  <Draggable
+                    key={item.id}
+                    draggableId={`sidebar-${item.id}`}
+                    index={index}
+                  >
                     {(provided, snapshot) => (
                       <div
                         ref={provided.innerRef}
@@ -136,7 +160,9 @@ export function Sidebar({ setSidebarItems }: { setSidebarItems: (items: NodeItem
                         }`}
                       >
                         <div className="flex items-center space-x-3">
-                          <div className={`rounded-md ${item.color} p-1.5`}>{getIconComponent(item.iconName)}</div>
+                          <div className={`rounded-md ${item.color} p-1.5`}>
+                            {getIconComponent(item.iconName)}
+                          </div>
                           <span>{item.label}</span>
                         </div>
                         <div className="flex items-center space-x-1">
@@ -170,5 +196,5 @@ export function Sidebar({ setSidebarItems }: { setSidebarItems: (items: NodeItem
         </div>
       ))}
     </div>
-  )
+  );
 }

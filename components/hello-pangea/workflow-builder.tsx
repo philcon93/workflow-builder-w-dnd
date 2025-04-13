@@ -19,8 +19,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
 import { Sidebar } from "./sidebar";
-import { StartNode } from "../nodes/start-node";
-import { ActionNode } from "../nodes/action-node";
+import { ActionNode, StartNode } from "./nodes";
 import { EdgeDropZone } from "./edge-drop-zone";
 import { NavigationHeader } from "../navigation-header";
 
@@ -35,17 +34,69 @@ const edgeTypes: EdgeTypes = {
   dropzone: EdgeDropZone,
 };
 
-// Initial nodes and edges
+// Initial nodes with Start, Update Profile Property, and Notification
 const initialNodes: Node[] = [
   {
     id: "start",
     type: "start",
-    position: { x: 250, y: 5 },
+    position: { x: 250, y: 50 },
     data: { label: "Start" },
+  },
+  {
+    id: "update-profile",
+    type: "action",
+    position: { x: 250, y: 150 },
+    data: {
+      id: "update-profile",
+      label: "Update Profile Property",
+      iconName: "user",
+      category: "actions",
+      color: "bg-amber-50",
+    },
+  },
+  {
+    id: "notification",
+    type: "action",
+    position: { x: 250, y: 250 },
+    data: {
+      id: "notification",
+      label: "Notification",
+      iconName: "bell",
+      category: "actions",
+      color: "bg-indigo-50",
+    },
   },
 ];
 
-const initialEdges: Edge[] = [];
+// Initial edges connecting the nodes
+const initialEdges: Edge[] = [
+  {
+    id: "e-start-update-profile",
+    source: "start",
+    target: "update-profile",
+    type: "dropzone",
+    animated: false,
+    style: { strokeWidth: 2 },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+    sourceHandle: "b",
+    targetHandle: "t",
+  },
+  {
+    id: "e-update-profile-notification",
+    source: "update-profile",
+    target: "notification",
+    type: "dropzone",
+    animated: false,
+    style: { strokeWidth: 2 },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+    sourceHandle: "b",
+    targetHandle: "t",
+  },
+];
 
 export default function WorkflowBuilder() {
   return (
@@ -85,7 +136,7 @@ function FlowCanvas() {
   // Handle drag end from hello-pangea/dnd
   const onDragEnd = useCallback(
     (result: DropResult) => {
-      const { destination, draggableId } = result;
+      const { destination, source, draggableId } = result;
 
       // If dropped outside a droppable area
       if (!destination) {
@@ -99,80 +150,190 @@ function FlowCanvas() {
 
         if (!edge) return;
 
-        // Find the item that was dragged
-        const item = sidebarItems.find((item) => item.id === draggableId);
-        if (!item) return;
+        // Check if this is a node being reordered (dragged from the flow)
+        const isNodeReordering = source.droppableId.startsWith("node-");
+        const draggedNodeId = isNodeReordering
+          ? draggableId.replace("node-", "")
+          : null;
 
-        // Find source and target nodes to calculate position
-        const sourceNode = nodes.find((n) => n.id === edge.source);
-        const targetNode = nodes.find((n) => n.id === edge.target);
+        if (isNodeReordering) {
+          // Handle node reordering
+          const draggedNode = nodes.find((n) => n.id === draggedNodeId);
+          if (!draggedNode) return;
 
-        if (!sourceNode || !targetNode) return;
+          // Find the source and target nodes of the edge
+          const sourceNode = nodes.find((n) => n.id === edge.source);
+          const targetNode = nodes.find((n) => n.id === edge.target);
+          if (!sourceNode || !targetNode) return;
 
-        // Calculate midpoint for drop position
-        const midX = (sourceNode.position.x + targetNode.position.x) / 2;
-        const midY = (sourceNode.position.y + targetNode.position.y) / 2 + 50;
+          // Remove the dragged node from its current position
+          // We need to find all edges connected to this node
+          const incomingEdge = edges.find((e) => e.target === draggedNodeId);
+          const outgoingEdge = edges.find((e) => e.source === draggedNodeId);
 
-        // Create a new node
-        const newNode = {
-          id: `${item.category}-${Date.now()}`,
-          type: "action",
-          position: { x: midX, y: midY },
-          data: { ...item },
-        };
+          if (!incomingEdge || !outgoingEdge) return;
 
-        // Add the new node
-        setNodes((nds) => nds.concat(newNode));
-
-        // Remove the original edge
-        setEdges((eds) => eds.filter((e) => e.id !== edgeId));
-
-        // Create two new edges
-        const newEdges = [
-          {
-            id: `e-${edge.source}-${newNode.id}`,
-            source: edge.source,
-            target: newNode.id,
+          // Connect the nodes that were connected to the dragged node
+          const newConnectingEdge = {
+            id: `e-${incomingEdge.source}-${outgoingEdge.target}`,
+            source: incomingEdge.source,
+            target: outgoingEdge.target,
             type: "dropzone",
             animated: false,
             style: { strokeWidth: 2 },
             markerEnd: {
               type: MarkerType.ArrowClosed,
             },
-            sourceHandle: edge.sourceHandle,
-            targetHandle: "t",
-          },
-          {
-            id: `e-${newNode.id}-${edge.target}`,
-            source: newNode.id,
-            target: edge.target,
-            type: "dropzone",
-            animated: false,
-            style: { strokeWidth: 2 },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-            },
-            sourceHandle: "b",
-            targetHandle: edge.targetHandle,
-          },
-        ];
+            sourceHandle: incomingEdge.sourceHandle,
+            targetHandle: outgoingEdge.targetHandle,
+          };
 
-        setEdges((eds) => [...eds, ...newEdges]);
+          // Remove the original edge and the edges connected to the dragged node
+          const edgesToRemove = [edgeId, incomingEdge.id, outgoingEdge.id];
+          const filteredEdges = edges.filter(
+            (e) => !edgesToRemove.includes(e.id)
+          );
+
+          // Create new edges for the dragged node in its new position
+          const newEdges = [
+            {
+              id: `e-${edge.source}-${draggedNodeId}`,
+              source: edge.source,
+              target: draggedNodeId,
+              type: "dropzone",
+              animated: false,
+              style: { strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+              },
+              sourceHandle: edge.sourceHandle,
+              targetHandle: "t",
+            },
+            {
+              id: `e-${draggedNodeId}-${edge.target}`,
+              source: draggedNodeId,
+              target: edge.target,
+              type: "dropzone",
+              animated: false,
+              style: { strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+              },
+              sourceHandle: "b",
+              targetHandle: edge.targetHandle,
+            },
+            newConnectingEdge,
+          ];
+
+          // Calculate new position for the dragged node
+          const midX = (sourceNode.position.x + targetNode.position.x) / 2;
+          const midY = (sourceNode.position.y + targetNode.position.y) / 2 + 50;
+
+          // Update the node position
+          setNodes((nds) =>
+            nds.map((n) => {
+              if (n.id === draggedNodeId) {
+                return {
+                  ...n,
+                  position: { x: midX, y: midY },
+                };
+              }
+              return n;
+            })
+          );
+
+          // Update edges
+          setEdges([...filteredEdges, ...newEdges]);
+        } else {
+          // Handle new node from sidebar
+          // Find the item that was dragged
+          const sidebarId = draggableId.replace("sidebar-", "");
+          const item = sidebarItems.find((item) => item.id === sidebarId);
+          if (!item) return;
+
+          // Find source and target nodes to calculate position
+          const sourceNode = nodes.find((n) => n.id === edge.source);
+          const targetNode = nodes.find((n) => n.id === edge.target);
+
+          if (!sourceNode || !targetNode) return;
+
+          // Calculate midpoint for drop position
+          const midX = (sourceNode.position.x + targetNode.position.x) / 2;
+          const midY = (sourceNode.position.y + targetNode.position.y) / 2 + 50;
+
+          // Create a new node
+          const newNode = {
+            id: `${item.category}-${Date.now()}`,
+            type: "action",
+            position: { x: midX, y: midY },
+            data: { ...item },
+          };
+
+          // Add the new node
+          setNodes((nds) => nds.concat(newNode));
+
+          // Remove the original edge
+          setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+
+          // Create two new edges
+          const newEdges = [
+            {
+              id: `e-${edge.source}-${newNode.id}`,
+              source: edge.source,
+              target: newNode.id,
+              type: "dropzone",
+              animated: false,
+              style: { strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+              },
+              sourceHandle: edge.sourceHandle,
+              targetHandle: "t",
+            },
+            {
+              id: `e-${newNode.id}-${edge.target}`,
+              source: newNode.id,
+              target: edge.target,
+              type: "dropzone",
+              animated: false,
+              style: { strokeWidth: 2 },
+              markerEnd: {
+                type: MarkerType.ArrowClosed,
+              },
+              sourceHandle: "b",
+              targetHandle: edge.targetHandle,
+            },
+          ];
+
+          setEdges((eds) => [...eds, ...newEdges]);
+        }
       }
     },
     [edges, nodes, sidebarItems, setNodes, setEdges]
   );
 
-  // Add a plus button node after the start node if no other nodes exist
+  // Add a plus button node at the end of the workflow
   useEffect(() => {
-    if (nodes.length === 1 && nodes[0].id === "start" && edges.length === 0) {
-      const startNode = nodes[0];
-      const plusButtonPosition = {
-        x: startNode.position.x + 40,
-        y: startNode.position.y + 100,
-      };
+    // Find the last node in the workflow
+    const lastNode = nodes.find((node) => {
+      // A node is the last node if it has no outgoing edges
+      return !edges.some((edge) => edge.source === node.id);
+    });
 
-      // Add a plus button node
+    // If there's no last node or it's already a plus button, do nothing
+    if (!lastNode || lastNode.id === "plus-button") return;
+
+    // Calculate position for the plus button
+    const plusButtonPosition = {
+      x: lastNode.position.x,
+      y: lastNode.position.y + 100,
+    };
+
+    // Check if plus button already exists
+    const plusButtonExists = nodes.some((node) => node.id === "plus-button");
+
+    // If plus button doesn't exist, add it
+    if (!plusButtonExists) {
       setNodes((nds) => [
         ...nds,
         {
@@ -195,19 +356,66 @@ function FlowCanvas() {
         },
       ]);
 
-      // Add an edge from start to plus button
-      setEdges([
+      // Add an edge from the last node to the plus button
+      setEdges((eds) => [
+        ...eds,
         {
-          id: "e-start-plus",
-          source: "start",
+          id: `e-${lastNode.id}-plus`,
+          source: lastNode.id,
           target: "plus-button",
           type: "dropzone",
           style: { strokeWidth: 2 },
           markerEnd: {
             type: MarkerType.ArrowClosed,
           },
+          sourceHandle: "b",
         },
       ]);
+    } else {
+      // Update plus button position and connection if it exists
+      setNodes((nds) =>
+        nds.map((node) => {
+          if (node.id === "plus-button") {
+            return {
+              ...node,
+              position: plusButtonPosition,
+            };
+          }
+          return node;
+        })
+      );
+
+      // Update or add the edge from the last node to the plus button
+      const edgeExists = edges.some((edge) => edge.target === "plus-button");
+      if (!edgeExists) {
+        setEdges((eds) => [
+          ...eds,
+          {
+            id: `e-${lastNode.id}-plus`,
+            source: lastNode.id,
+            target: "plus-button",
+            type: "dropzone",
+            style: { strokeWidth: 2 },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+            },
+            sourceHandle: "b",
+          },
+        ]);
+      } else {
+        setEdges((eds) =>
+          eds.map((edge) => {
+            if (edge.target === "plus-button") {
+              return {
+                ...edge,
+                source: lastNode.id,
+                id: `e-${lastNode.id}-plus`,
+              };
+            }
+            return edge;
+          })
+        );
+      }
     }
   }, [nodes, edges, setNodes, setEdges]);
 

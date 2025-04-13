@@ -19,7 +19,6 @@ export function EdgeDropZone({
   targetPosition,
   style = {},
   markerEnd,
-  data,
 }: EdgeProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -36,19 +35,13 @@ export function EdgeDropZone({
     <>
       <BaseEdge
         id={id}
-        style={{
-          ...style,
-          strokeWidth: 2,
-          stroke: "#b1b1b7",
-        }}
+        style={style}
         className="react-flow__edge-path"
         path={edgePath}
         markerEnd={markerEnd}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
       />
       <EdgeLabelRenderer>
-        <Droppable droppableId={`edge-${id}`} type="SIDEBAR">
+        <Droppable droppableId={`edge-${id}`} type="NODE">
           {(provided, snapshot) => (
             <div
               ref={provided.innerRef}
@@ -72,7 +65,7 @@ export function EdgeDropZone({
               >
                 <span className="text-xl">+</span>
               </div>
-              {provided.placeholder}
+              <div className="hidden">{provided.placeholder}</div>
             </div>
           )}
         </Droppable>
