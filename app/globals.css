@@ -87,3 +87,33 @@
   background-color: #7c3aed;
   color: white;
 }
+
+/* Enhance the edge path hover effect for Hello Pangea DnD */
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke: #7c3aed !important;
+  stroke-width: 3px !important;
+}
+
+/* Style for the edge drop zone plus button */
+.edge-dropzone-button {
+  transition: transform 0.2s ease, background-color 0.2s ease;
+}
+
+/* Enhanced styles for edge drop zones */
+.edge-dropzone-active .react-flow__edge-path {
+  stroke-dasharray: 5 !important;
+}
+
+/* Edge dropzone styles */
+.edge-dropzone {
+  pointer-events: all;
+  z-index: 10;
+}
+
+.edge-dropzone-hovered {
+  z-index: 20;
+}
+
+.edge-dropzone-active {
+  z-index: 30;
+}

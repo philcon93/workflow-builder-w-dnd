@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -15,13 +15,15 @@ import {
   type EdgeTypes,
   MarkerType,
   PanOnScrollMode,
-  useNodesInitialized,
+  useReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { DragDropContext, type DropResult } from "@hello-pangea/dnd";
+import dagre from "@dagrejs/dagre";
 import { Sidebar } from "./sidebar";
 import { StartNode } from "./nodes/start-node";
 import { ActionNode } from "./nodes/action-node";
+import { EndNode } from "./nodes/end-node";
 import { EdgeDropZone } from "./edge-drop-zone";
 import { NavigationHeader } from "../navigation-header";
 import { useSetViewport } from "./useSetViewport";
@@ -32,6 +34,7 @@ import { useTranslateExtent } from "./useTranslateExtent";
 const nodeTypes: NodeTypes = {
   start: StartNode,
   action: ActionNode,
+  end: EndNode,
 };
 
 // Define custom edge types
@@ -39,18 +42,18 @@ const edgeTypes: EdgeTypes = {
   dropzone: EdgeDropZone,
 };
 
-// Initial nodes with Start, Update Profile Property, and Notification
+// Initial nodes without specific positions (dagre will handle positioning)
 const initialNodes: Node[] = [
   {
     id: "start",
     type: "start",
-    position: { x: 250, y: 0 },
+    position: { x: 0, y: 0 }, // Position will be calculated by dagre
     data: { label: "Start" },
   },
   {
     id: "update-profile",
     type: "action",
-    position: { x: 250, y: 150 },
+    position: { x: 0, y: 0 }, // Position will be calculated by dagre
     data: {
       id: "update-profile",
       label: "Update Profile Property",
@@ -62,7 +65,7 @@ const initialNodes: Node[] = [
   {
     id: "notification",
     type: "action",
-    position: { x: 250, y: 300 },
+    position: { x: 0, y: 0 }, // Position will be calculated by dagre
     data: {
       id: "notification",
       label: "Notification",
@@ -70,6 +73,12 @@ const initialNodes: Node[] = [
       category: "actions",
       color: "bg-indigo-50",
     },
+  },
+  {
+    id: "end",
+    type: "end",
+    position: { x: 0, y: 0 }, // Position will be calculated by dagre
+    data: { label: "End" },
   },
 ];
 
@@ -101,7 +110,122 @@ const initialEdges: Edge[] = [
     sourceHandle: "b",
     targetHandle: "t",
   },
+  {
+    id: "e-notification-end",
+    source: "notification",
+    target: "end",
+    type: "dropzone",
+    animated: false,
+    style: { strokeWidth: 2 },
+    markerEnd: {
+      type: MarkerType.ArrowClosed,
+    },
+    sourceHandle: "b",
+    targetHandle: "t",
+  },
 ];
+
+// Function to calculate layout using dagre with custom ranksep for hovered edge
+const getLayoutedElements = (
+  nodes: Node[],
+  edges: Edge[],
+  hoveredEdgeId: string | null = null,
+  isDragging = false
+) => {
+  if (nodes.length === 0) return { nodes, edges };
+
+  // Create a new directed graph
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  // Set graph options
+  const nodeWidth = 256; // Width of our nodes
+  const nodeHeight = 64; // Height of our nodes
+
+  // Default ranksep is 50
+  const defaultRanksep = 50;
+  const expandedRanksep = 100;
+
+  // Set the default graph settings
+  dagreGraph.setGraph({
+    rankdir: "TB",
+    nodesep: 80,
+    ranksep: defaultRanksep,
+    marginx: 20,
+    marginy: 20,
+  });
+
+  // Add nodes to the graph with their dimensions
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: nodeWidth, height: nodeHeight });
+  });
+
+  // Find the hovered edge if any
+  const hoveredEdge = hoveredEdgeId
+    ? edges.find((e) => e.id === hoveredEdgeId)
+    : null;
+
+  // Add edges to the graph with custom weights for the hovered edge
+  edges.forEach((edge) => {
+    if (isDragging && hoveredEdge && edge.id === hoveredEdge.id) {
+      // For the hovered edge, we set a custom weight to increase spacing
+      dagreGraph.setEdge(edge.source, edge.target, { weight: 2 });
+    } else {
+      dagreGraph.setEdge(edge.source, edge.target);
+    }
+  });
+
+  // Calculate the layout
+  dagre.layout(dagreGraph);
+
+  // Get the positioned nodes from the layout
+  let layoutedNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    if (!nodeWithPosition) return node;
+
+    return {
+      ...node,
+      // We need to center the node based on the calculated position
+      position: {
+        x: nodeWithPosition.x - nodeWidth / 2,
+        y: nodeWithPosition.y - nodeHeight / 2,
+      },
+    };
+  });
+
+  // If we have a hovered edge and we're dragging, adjust the positions of nodes after the target node
+  if (hoveredEdge && isDragging) {
+    const sourceNode = layoutedNodes.find((n) => n.id === hoveredEdge.source);
+    const targetNode = layoutedNodes.find((n) => n.id === hoveredEdge.target);
+
+    if (sourceNode && targetNode) {
+      // Calculate the extra space needed
+      const extraSpace = expandedRanksep - defaultRanksep;
+
+      // Find all nodes that are positioned below the target node
+      const nodesBelow = layoutedNodes.filter((n) => {
+        // If the node is positioned below the target node
+        return n.position.y > targetNode.position.y;
+      });
+
+      // Move all nodes below the target node down by the extra space
+      layoutedNodes = layoutedNodes.map((node) => {
+        if (nodesBelow.some((n) => n.id === node.id)) {
+          return {
+            ...node,
+            position: {
+              x: node.position.x,
+              y: node.position.y + extraSpace,
+            },
+          };
+        }
+        return node;
+      });
+    }
+  }
+
+  return { nodes: layoutedNodes, edges };
+};
 
 export default function WorkflowBuilder() {
   return (
@@ -113,16 +237,76 @@ export default function WorkflowBuilder() {
 
 function FlowCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [sidebarItems, setSidebarItems] = useState<any[]>([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const isLayoutingRef = useRef(false);
+  const reactFlowInstance = useReactFlow();
 
   const { translateExtent } = useTranslateExtent();
   const { setFlowViewport } = useSetViewport();
   const { width } = useCanvasSize();
-  const nodesInitialized = useNodesInitialized();
   const [viewportInitialized, setViewportInitialized] = useState(false);
+
+  // Handle edge hover state changes
+  const handleEdgeHover = useCallback(
+    (edgeId: string, isHovered: boolean) => {
+      if (isHovered) {
+        setHoveredEdgeId(edgeId);
+      } else if (hoveredEdgeId === edgeId) {
+        setHoveredEdgeId(null);
+      }
+    },
+    [hoveredEdgeId]
+  );
+
+  // Initialize the layout only once
+  useEffect(() => {
+    if (!isInitialized && !isLayoutingRef.current) {
+      isLayoutingRef.current = true;
+      const { nodes: layoutedNodes, edges: layoutedEdges } =
+        getLayoutedElements(initialNodes, initialEdges);
+      setNodes(layoutedNodes);
+      setEdges(layoutedEdges);
+      setIsInitialized(true);
+      isLayoutingRef.current = false;
+    }
+  }, [isInitialized, setNodes, setEdges]);
+
+  // Apply layout function - only called explicitly, not in useEffect
+  const applyLayout = useCallback(() => {
+    if (isLayoutingRef.current) return;
+    isLayoutingRef.current = true;
+
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      nodes,
+      edges,
+      hoveredEdgeId,
+      isDragging
+    );
+
+    // Update nodes with new positions
+    setNodes((nds) =>
+      nds.map((node) => {
+        const layoutNode = layoutedNodes.find((n) => n.id === node.id);
+        if (layoutNode) {
+          return {
+            ...node,
+            position: layoutNode.position,
+          };
+        }
+        return node;
+      })
+    );
+
+    // Set timeout to reset the layouting flag
+    setTimeout(() => {
+      isLayoutingRef.current = false;
+    }, 50);
+  }, [nodes, edges, setNodes, hoveredEdgeId, isDragging]);
 
   // Handle connections between nodes
   const onConnect = useCallback(
@@ -154,6 +338,12 @@ function FlowCanvas() {
   const onDragEnd = useCallback(
     (result: DropResult) => {
       setIsDragging(false);
+      setHoveredEdgeId(null);
+
+      // Apply layout with default spacing
+      setTimeout(() => {
+        applyLayout();
+      }, 50);
 
       const { destination, source, draggableId } = result;
 
@@ -175,7 +365,7 @@ function FlowCanvas() {
           ? draggableId.replace("node-", "")
           : null;
 
-        if (isNodeReordering) {
+        if (isNodeReordering && draggedNodeId) {
           // Handle node reordering
           const draggedNode = nodes.find((n) => n.id === draggedNodeId);
           if (!draggedNode) return;
@@ -244,25 +434,11 @@ function FlowCanvas() {
             newConnectingEdge,
           ];
 
-          // Calculate new position for the dragged node
-          const midX = (sourceNode.position.x + targetNode.position.x) / 2;
-          const midY = (sourceNode.position.y + targetNode.position.y) / 2 + 50;
-
-          // Update the node position
-          setNodes((nds) =>
-            nds.map((n) => {
-              if (n.id === draggedNodeId) {
-                return {
-                  ...n,
-                  position: { x: midX, y: midY },
-                };
-              }
-              return n;
-            })
-          );
-
           // Update edges
           setEdges([...filteredEdges, ...newEdges]);
+
+          // Schedule layout after state updates are complete
+          setTimeout(applyLayout, 50);
         } else {
           // Handle new node from sidebar
           // Find the item that was dragged
@@ -270,29 +446,16 @@ function FlowCanvas() {
           const item = sidebarItems.find((item) => item.id === sidebarId);
           if (!item) return;
 
-          // Find source and target nodes to calculate position
-          const sourceNode = nodes.find((n) => n.id === edge.source);
-          const targetNode = nodes.find((n) => n.id === edge.target);
-
-          if (!sourceNode || !targetNode) return;
-
-          // Calculate midpoint for drop position
-          const midX = (sourceNode.position.x + targetNode.position.x) / 2;
-          const midY = (sourceNode.position.y + targetNode.position.y) / 2 + 50;
-
-          // Create a new node
+          // Create a new node (position will be calculated by dagre)
           const newNode = {
             id: `${item.category}-${Date.now()}`,
             type: "action",
-            position: { x: midX, y: midY },
+            position: { x: 0, y: 0 }, // Temporary position, will be updated by dagre
             data: { ...item },
           };
 
-          // Add the new node
-          setNodes((nds) => nds.concat(newNode));
-
           // Remove the original edge
-          setEdges((eds) => eds.filter((e) => e.id !== edgeId));
+          const updatedEdges = edges.filter((e) => e.id !== edgeId);
 
           // Create two new edges
           const newEdges = [
@@ -324,132 +487,62 @@ function FlowCanvas() {
             },
           ];
 
-          setEdges((eds) => [...eds, ...newEdges]);
+          // Update state in a single batch
+          setNodes((nds) => [...nds, newNode]);
+          setEdges([...updatedEdges, ...newEdges]);
+
+          // Schedule layout after state updates are complete
+          setTimeout(applyLayout, 50);
         }
       }
     },
-    [edges, nodes, sidebarItems, setNodes, setEdges]
+    [edges, nodes, sidebarItems, setNodes, setEdges, applyLayout]
   );
 
+  // Handle viewport initialization
   useEffect(() => {
-    if (nodesInitialized && !viewportInitialized) {
+    if (nodes.length > 0 && !viewportInitialized) {
       setViewportInitialized(true);
-
       // set initial viewport
-      setFlowViewport(30);
+      setFlowViewport(0.3);
     }
-  }, [nodesInitialized, setFlowViewport, viewportInitialized]);
+  }, [nodes.length, setFlowViewport, viewportInitialized]);
 
+  // Handle viewport updates on window resize
   useEffect(() => {
-    setFlowViewport();
-  }, [width, setFlowViewport]);
-
-  // Add a plus button node at the end of the workflow
-  useEffect(() => {
-    // Find the last node in the workflow
-    const lastNode = nodes.find((node) => {
-      // A node is the last node if it has no outgoing edges
-      return !edges.some((edge) => edge.source === node.id);
-    });
-
-    // If there's no last node or it's already a plus button, do nothing
-    if (!lastNode || lastNode.id === "plus-button") return;
-
-    // Calculate position for the plus button
-    const plusButtonPosition = {
-      x: lastNode.position.x + 108,
-      y: lastNode.position.y + 150,
-    };
-
-    // Check if plus button already exists
-    const plusButtonExists = nodes.some((node) => node.id === "plus-button");
-
-    // If plus button doesn't exist, add it
-    if (!plusButtonExists) {
-      setNodes((nds) => [
-        ...nds,
-        {
-          id: "plus-button",
-          type: "default",
-          position: plusButtonPosition,
-          data: {
-            label: (
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-500 text-white">
-                <span className="text-xl">+</span>
-              </div>
-            ),
-          },
-          style: {
-            background: "transparent",
-            border: "none",
-            width: 40,
-            height: 40,
-          },
-        },
-      ]);
-
-      // Add an edge from the last node to the plus button
-      setEdges((eds) => [
-        ...eds,
-        {
-          id: `e-${lastNode.id}-plus`,
-          source: lastNode.id,
-          target: "plus-button",
-          type: "dropzone",
-          style: { strokeWidth: 2 },
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-          },
-          sourceHandle: "b",
-        },
-      ]);
-    } else {
-      // Update plus button position and connection if it exists
-      setNodes((nds) =>
-        nds.map((node) => {
-          if (node.id === "plus-button") {
-            return {
-              ...node,
-              position: plusButtonPosition,
-            };
-          }
-          return node;
-        })
-      );
-
-      // Update or add the edge from the last node to the plus button
-      const edgeExists = edges.some((edge) => edge.target === "plus-button");
-      if (!edgeExists) {
-        setEdges((eds) => [
-          ...eds,
-          {
-            id: `e-${lastNode.id}-plus`,
-            source: lastNode.id,
-            target: "plus-button",
-            type: "dropzone",
-            style: { strokeWidth: 2 },
-            markerEnd: {
-              type: MarkerType.ArrowClosed,
-            },
-            sourceHandle: "b",
-          },
-        ]);
-      } else {
-        setEdges((eds) =>
-          eds.map((edge) => {
-            if (edge.target === "plus-button") {
-              return {
-                ...edge,
-                source: lastNode.id,
-                id: `e-${lastNode.id}-plus`,
-              };
-            }
-            return edge;
-          })
-        );
-      }
+    if (width > 0 && viewportInitialized) {
+      setFlowViewport(0.3);
     }
-  }, [nodes, edges, setNodes, setEdges]);
+  }, [width, setFlowViewport, viewportInitialized]);
+
+  // Apply layout when nodes or edges change significantly
+  useEffect(() => {
+    if (isInitialized && nodes.length > 0 && !isLayoutingRef.current) {
+      // This will only run after initial setup and when nodes/edges change
+      // due to user actions, not during the layout process itself
+      applyLayout();
+    }
+  }, [isInitialized, nodes.length, edges.length, applyLayout]);
+
+  // Apply layout when hoveredEdgeId changes during dragging
+  useEffect(() => {
+    if (isInitialized && !isLayoutingRef.current) {
+      applyLayout();
+    }
+  }, [hoveredEdgeId, isInitialized, applyLayout]);
+
+  // Memoize the edges with isDragging state to prevent unnecessary re-renders
+  const edgesWithDraggingState = useMemo(() => {
+    return edges.map((edge) => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        isDragging,
+        onHoverChange: handleEdgeHover,
+        isHovered: edge.id === hoveredEdgeId,
+      },
+    }));
+  }, [edges, isDragging, hoveredEdgeId, handleEdgeHover]);
 
   return (
     <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -460,14 +553,12 @@ function FlowCanvas() {
           <div className="h-full w-full flex-1" ref={reactFlowWrapper}>
             <ReactFlow
               nodes={nodes}
-              edges={edges.map((edge) => ({
-                ...edge,
-                data: { ...edge.data, isDragging },
-              }))}
+              edges={edgesWithDraggingState}
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               onConnect={onConnect}
-              fitView={false}
+              fitView={true}
+              fitViewOptions={{ padding: 0.2 }}
               panOnScroll
               panOnScrollMode={PanOnScrollMode.Vertical}
               zoomOnScroll={false}
